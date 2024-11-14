@@ -1,0 +1,3 @@
+/mnt/Myfiles/VUT FIT/IZP/IZP-2-Project/cmake-build-debug/CMakeFiles/IZP_2_Project.dir
+/mnt/Myfiles/VUT FIT/IZP/IZP-2-Project/cmake-build-debug/CMakeFiles/edit_cache.dir
+/mnt/Myfiles/VUT FIT/IZP/IZP-2-Project/cmake-build-debug/CMakeFiles/rebuild_cache.dir
