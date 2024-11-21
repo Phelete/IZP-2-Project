@@ -1,0 +1,30 @@
+# Игнорируем скомпилированные файлы
+bin/
+
+# Игнорируем временные файлы CLion
+.idea/
+*.iml
+
+# Игнорируем файлы CMake
+CMakeLists.txt.user
+cmake-build-debug/
+cmake-build-release/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+.cmake-build-debug/
+CMakeLists.txt
+
+# Игнорируем временные файлы сборки
+*.o
+*.obj
+*.so
+*.a
+*.out
+*.exe
+
+tests.py
+tests/
+.gitignore
+log.json
