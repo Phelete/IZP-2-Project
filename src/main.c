@@ -4,7 +4,7 @@
 
 #define HORIZONTAL_LINE 0
 #define VERTICAL_LINE 1
-#define EMPTY_LINE {-1, -1, 0, -1}
+#define EMPTY_LINE (Line){-1, -1, 0, -1}
 
 typedef struct {
     int x_coordinate;
@@ -125,7 +125,7 @@ int search_all_lines(const Image *image, Line **result, int *result_size) {
 
     if (*result == NULL) {
         *result_size = 10;
-        *result = malloc(sizeof(Line) * (*result_size));
+        *result = malloc(sizeof(Line) * *result_size);
         if (*result == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
             return -1;
@@ -158,7 +158,7 @@ int search_all_lines(const Image *image, Line **result, int *result_size) {
                 }
                 (*result)[lines_idx++] = line;
                 in_line = 0;
-                line = (Line)EMPTY_LINE;
+                line = EMPTY_LINE;
             }
         }
         if (in_line) {
@@ -214,35 +214,60 @@ int main(int argc, char *argv[]) {
         }
     }
     else if(strcmp(command, "hline") == 0) {
-        if (argc >= 3) {
-            Image image;
-            parse_image(&image, argv[2]);
-
-            if(test_file(argv[2])) {
-                fprintf(stderr,"%s", "Invalid");
-                return -1;
-            }
-
-            Line longest_line = EMPTY_LINE;
-            int hline_len = search_hline(&image, &longest_line);
-            if (hline_len == -1) {
-                fprintf(stderr,"%s", "Invalid");
-                return -1;
-            }
-            if (longest_line.length-1 == 0) {
-                printf("%s", "Not found");
-                free_bitmap(&image);
-                return 0;
-            }
-            printf("%i %i %i %i", longest_line.x_coordinate, longest_line.y_coordinate, longest_line.x_coordinate, longest_line.y_coordinate+longest_line.length-1);
-            free_bitmap(&image);
+        if (argc < 3) {
+            printf("%s", "Invalid argument count");
+            show_help();
+            return 1;
         }
+        Image image;
+        parse_image(&image, argv[2]);
+
+        if(test_file(argv[2])) {
+            fprintf(stderr,"%s", "Invalid");
+            return -1;
+        }
+
+        Line longest_line = EMPTY_LINE;
+        int hline_len = search_hline(&image, &longest_line);
+        free_bitmap(&image);
+
+        if (hline_len == -1) {
+            fprintf(stderr,"%s", "Invalid");
+            return -1;
+        }
+        if (longest_line.length-1 == 0) {
+            printf("%s", "Not found");
+            return 0;
+        }
+        printf("%i %i %i %i", longest_line.x_coordinate, longest_line.y_coordinate, longest_line.x_coordinate, longest_line.y_coordinate+longest_line.length-1);
     }
     else if(strcmp(command, "vline") == 0) {
-        // fprintf(stderr,"%s", "Invalid");
+        if (argc < 3) {
+            printf("%s", "Invalid argument count");
+            show_help();
+            return 1;
+        }
+        Image image;
+        parse_image(&image, argv[2]);
+
+        if(test_file(argv[2])) {
+            fprintf(stderr,"%s", "Invalid");
+            return -1;
+        }
     }
     else if(strcmp(command, "square") == 0) {
-        // fprintf(stderr,"%s", "Invalid");
+        if (argc < 3) {
+            printf("%s", "Invalid argument count");
+            show_help();
+            return 1;
+        }
+        Image image;
+        parse_image(&image, argv[2]);
+
+        if(test_file(argv[2])) {
+            fprintf(stderr,"%s", "Invalid");
+            return -1;
+        }
     }
     else {
         show_help();
