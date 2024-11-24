@@ -58,37 +58,18 @@ int allocate_bitmap(Image *image) {
     }
     image->bitmap = allocated_array;
 
-    for(int i = 0; i < image->height; i++) {
+    for (int allocated_row = 0; allocated_row < image->height; allocated_row++) {
         int *allocated = malloc(image->width * sizeof(int));
         if(allocated == NULL) {
+            for (int was_allocated = 0; was_allocated < allocated_row; was_allocated++) {
+                free(image->bitmap[was_allocated]);
+            }
+            free(allocated_array);
+            image->bitmap = NULL;
             return 1;
         }
-        image->bitmap[i] = allocated;
+        image->bitmap[allocated_row] = allocated;
     }
-    return 0;
-}
-
-int parse_image(Image *dst, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (file == NULL) {
-        return 1;
-    }
-
-    if (fscanf(file, "%d %d", &dst->height, &dst->width) != 2 || dst->height <= 0 || dst->width <= 0) {
-        return 1;
-    }
-
-    allocate_bitmap(dst);
-
-    for(int row = 0; row < dst->height; row++) {
-        for(int col = 0; col < dst->width; col++) {
-            int value;
-            fscanf(file, "%i", &value);
-            dst->bitmap[row][col] = value;
-        }
-    }
-
-    fclose(file);
     return 0;
 }
 
@@ -104,6 +85,38 @@ int free_bitmap(Image *image) {
     return 0;
 }
 
+int parse_image(Image *dst, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        return 1;
+    }
+
+    if (fscanf(file, "%d %d", &dst->height, &dst->width) != 2 || dst->height <= 0 || dst->width <= 0) {
+        fclose(file);
+        return 1;
+    }
+
+    if (allocate_bitmap(dst)) {
+        fclose(file);
+        return 1;
+    }
+
+    for (int row = 0; row < dst->height; row++) {
+        for(int col = 0; col < dst->width; col++) {
+            int value;
+            if (fscanf(file, "%i", &value) != 1) {
+                free_bitmap(dst);
+                fclose(file);
+                return 1;
+            }
+            dst->bitmap[row][col] = value;
+        }
+    }
+
+    fclose(file);
+    return 0;
+}
+
 void show_help() {
     printf("Usage: ./figsearch <operation> [...].\n");
     printf("Operations: \n");
@@ -115,13 +128,17 @@ void show_help() {
     printf("Example: ./figsearch --help\n");
 }
 
-int search_all_lines(const Image *image, Line **result, int *result_size) {
+int search_all_lines(const Image *image, Line **result, int *result_size, int lines_type) {
     if (image->height <= 0 || image->width <= 0 || image->bitmap == NULL) {
         fprintf(stderr, "Image is empty.\n");
         return -1;
     }
-
-    int lines_idx = 0;
+    int row_iterator = image->height;
+    int col_iterator = image->width;
+    if (lines_type == VERTICAL_LINE) {
+        row_iterator = image->width;
+        col_iterator = image->height;
+    }
 
     if (*result == NULL) {
         *result_size = 10;
@@ -132,25 +149,39 @@ int search_all_lines(const Image *image, Line **result, int *result_size) {
         }
     }
 
-    for (int row = 0; row < image->height; row++) {
+    int lines_idx = 0;
+    for (int row = 0; row < row_iterator; row++) {
         Line line = EMPTY_LINE;
         int in_line = 0;
-        for (int col = 0; col < image->width; col++) {
-            if (image->bitmap[row][col]) {
+        for (int col = 0; col < col_iterator; col++) {
+            int pos_color;
+            if (lines_type == VERTICAL_LINE)
+                pos_color = image->bitmap[col][row];
+            else
+                pos_color = image->bitmap[row][col];
+
+            if (pos_color) {
                 if (!in_line) {
-                    line.x_coordinate = row;
-                    line.y_coordinate = col;
+                    if (lines_type == VERTICAL_LINE) {
+                        line.x_coordinate = col;
+                        line.y_coordinate = row;
+                    }
+                    else {
+                        line.x_coordinate = row;
+                        line.y_coordinate = col;
+                    }
                     line.length = 1;
                     in_line = 1;
-                } else {
-                    line.length++;
+                    continue;
                 }
-            } else if (in_line) {
+                line.length++;
+                continue;
+            }
+            if (in_line) {
                 if (lines_idx >= *result_size) {
                     int new_size = (*result_size) * 2;
                     Line *lines_extend = realloc(*result, sizeof(Line) * new_size);
                     if (lines_extend == NULL) {
-                        free(*result);
                         return -1;
                     }
                     *result = lines_extend;
@@ -166,7 +197,6 @@ int search_all_lines(const Image *image, Line **result, int *result_size) {
                 int new_size = (*result_size) * 2;
                 Line *lines_extend = realloc(*result, sizeof(Line) * new_size);
                 if (lines_extend == NULL) {
-                    free(*result);
                     return -1;
                 }
                 *result = lines_extend;
@@ -183,12 +213,32 @@ int search_hline(const Image *image, Line *result) {
         return -1;
     Line *lines = NULL;
     int size = 0;
-    int found_count = search_all_lines(image, &lines, &size);
+    int found_count = search_all_lines(image, &lines, &size, HORIZONTAL_LINE);
     if (found_count > 0) {
         Line longest_line = EMPTY_LINE;
-        for (int i = 0; i < found_count; i++) {
-            if (lines[i].length > longest_line.length) {
-                longest_line = lines[i];
+        for (int found_index = 0; found_index < found_count; found_index++) {
+            if (lines[found_index].length > longest_line.length) {
+                longest_line = lines[found_index];
+            }
+        }
+        *result = longest_line;
+        return longest_line.length;
+    }
+    free(lines);
+    return 0;
+}
+
+int search_vline(const Image *image, Line *result) {
+    if(image->height < 0 || image->width < 0 || image->bitmap == NULL)
+        return -1;
+    Line *lines = NULL;
+    int size = 0;
+    int found_count = search_all_lines(image, &lines, &size, VERTICAL_LINE);
+    if (found_count > 0) {
+        Line longest_line = EMPTY_LINE;
+        for (int vline = 0; vline < found_count; vline++) {
+            if (lines[vline].length > longest_line.length) {
+                longest_line = lines[vline];
             }
         }
         *result = longest_line;
@@ -254,6 +304,20 @@ int main(int argc, char *argv[]) {
             fprintf(stderr,"%s", "Invalid");
             return -1;
         }
+
+        Line longest_line = EMPTY_LINE;
+        int vline_len = search_vline(&image, &longest_line);
+        free_bitmap(&image);
+
+        if (vline_len == -1) {
+            fprintf(stderr,"%s", "Invalid");
+            return -1;
+        }
+        if (longest_line.length-1 == 0) {
+            printf("%s", "Not found");
+            return 0;
+        }
+        printf("%i %i %i %i", longest_line.x_coordinate, longest_line.y_coordinate, longest_line.x_coordinate+longest_line.length-1, longest_line.y_coordinate);
     }
     else if(strcmp(command, "square") == 0) {
         if (argc < 3) {

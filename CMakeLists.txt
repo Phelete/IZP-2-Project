@@ -3,4 +3,4 @@ project(IZP_2_Project C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(IZP_2_Project src/main.c)
+add_executable(IZP_2_Project src/figsearch.c)
