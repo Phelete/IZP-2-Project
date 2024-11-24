@@ -1,17 +1,35 @@
+/**
+ * @author Behari Youssef
+ * @name Figsearch
+ * @date 24 November 2024
+ * @version 1.0
+ *
+ * Description:
+ * Algorithm to find some kinds of figures in bitmap image.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define HORIZONTAL_LINE 0
 #define VERTICAL_LINE 1
-#define EMPTY_LINE (Line){-1, -1, 0, -1}
+#define EMPTY_LINE (Line){{-1, -1}, 0, -1}
 
 typedef struct {
     int x_coordinate;
     int y_coordinate;
+} Point;
+
+typedef struct {
+    Point start;
     int length;
     int line_type;
 } Line;
+
+typedef struct {
+    Point start_point;
+    Point end_point;
+} Square;
 
 typedef struct {
     int width;
@@ -19,7 +37,16 @@ typedef struct {
     int **bitmap;
 } Image;
 
-int test_file(char *filename) {
+/**
+ * @brief Testing file for correct bitmap content.
+ *
+ * Checks if the file contains the correct bitmap definition.
+ *
+ * @param[in] filename Filename to test content in.
+ * @return 0 if file contains correct bitmap definition(test is passed).
+ * @return 1 if file contains wrong bitmap defenition(test is not passed).
+ */
+int test_file(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         fprintf(stderr, "Error opening file %s\n", filename);
@@ -51,6 +78,13 @@ int test_file(char *filename) {
     return !(current_row == rows && current_col == 0);
 }
 
+/**
+ * @brief Allocating space for store bitmap.
+ *
+ * @param[in] image Pointer to image to store bitmap content in.
+ * @return 0 if allocation was successful(everything went well).
+ * @return 1 if allocation was not successful(malloc error).
+ */
 int allocate_bitmap(Image *image) {
     int **allocated_array = malloc(image->height * sizeof(int *));
     if(allocated_array == NULL) {
@@ -73,6 +107,12 @@ int allocate_bitmap(Image *image) {
     return 0;
 }
 
+/**
+ * @brief Frees space where bitmap was stored.
+ *
+ * @param[in] image Pointer to image where bitmap stored is.
+ * @return 0 if deallocation was successful(everything went well).
+ */
 int free_bitmap(Image *image) {
     if (image->bitmap != NULL) {
         for(int row = 0; row < image->height; row++) {
@@ -85,6 +125,14 @@ int free_bitmap(Image *image) {
     return 0;
 }
 
+/**
+ * @brief Parses bitmap from to image structure.
+ *
+ * @param[in] filename Pointer to image where bitmap stored is.
+ * @param[out] dst Pointer to image where will bitmap stored be.
+ * @return 0 if parsing was successful(everything went well).
+ * @return 1 if parsing occurred with an error(error while parsing).
+ */
 int parse_image(Image *dst, const char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -92,6 +140,11 @@ int parse_image(Image *dst, const char *filename) {
     }
 
     if (fscanf(file, "%d %d", &dst->height, &dst->width) != 2 || dst->height <= 0 || dst->width <= 0) {
+        fclose(file);
+        return 1;
+    }
+
+    if (test_file(filename)) {
         fclose(file);
         return 1;
     }
@@ -117,17 +170,17 @@ int parse_image(Image *dst, const char *filename) {
     return 0;
 }
 
-void show_help() {
-    printf("Usage: ./figsearch <operation> [...].\n");
-    printf("Operations: \n");
-    printf("  --help    Show help message.\n");
-    printf("  test      Checking the input file for correct bitmap image content.\n");
-    printf("  hline     Find the longest horizontal line in the image.\n");
-    printf("  vline     Find the longest vertical line in the image.\n");
-    printf("  square    Find the biggest square in the image.\n");
-    printf("Example: ./figsearch --help\n");
-}
-
+/**
+ * @brief Search all lines in image.
+ *
+ * @param[in] image Pointer to image where bitmap stored is.
+ * @param[out] result Pointer to line array where line will stored be.
+ * @param[in] result_size Pointer to integer value, where line array size stored is.
+ * @param[in] lines_type Line type to find.
+ *
+ * @return lines count If function executing was without error(everything went well).
+ * @return -1 If error occurred while executing the function(error occurred).
+ */
 int search_all_lines(const Image *image, Line **result, int *result_size, int lines_type) {
     if (image->height <= 0 || image->width <= 0 || image->bitmap == NULL) {
         fprintf(stderr, "Image is empty.\n");
@@ -163,12 +216,12 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
             if (pos_color) {
                 if (!in_line) {
                     if (lines_type == VERTICAL_LINE) {
-                        line.x_coordinate = col;
-                        line.y_coordinate = row;
+                        line.start.x_coordinate = col;
+                        line.start.y_coordinate = row;
                     }
                     else {
-                        line.x_coordinate = row;
-                        line.y_coordinate = col;
+                        line.start.x_coordinate = row;
+                        line.start.y_coordinate = col;
                     }
                     line.length = 1;
                     in_line = 1;
@@ -208,32 +261,23 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
     return lines_idx;
 }
 
-int search_hline(const Image *image, Line *result) {
+/**
+ * @brief Searchs the longest line in image.
+ *
+ * @param[in] image Pointer to image where bitmap stored is.
+ * @param[out] result Pointer to line where result line will stored be.
+ * @param[in] line_type Line type to finding.
+ *
+ * @return 0...n count of find linex(everything went well).
+ * @return -1 шmage definition is not correct (image error).
+ */
+int search_longest_line(const Image *image, Line *result, int line_type) {
     if(image->height < 0 || image->width < 0 || image->bitmap == NULL)
         return -1;
-    Line *lines = NULL;
-    int size = 0;
-    int found_count = search_all_lines(image, &lines, &size, HORIZONTAL_LINE);
-    if (found_count > 0) {
-        Line longest_line = EMPTY_LINE;
-        for (int found_index = 0; found_index < found_count; found_index++) {
-            if (lines[found_index].length > longest_line.length) {
-                longest_line = lines[found_index];
-            }
-        }
-        *result = longest_line;
-        return longest_line.length;
-    }
-    free(lines);
-    return 0;
-}
 
-int search_vline(const Image *image, Line *result) {
-    if(image->height < 0 || image->width < 0 || image->bitmap == NULL)
-        return -1;
     Line *lines = NULL;
     int size = 0;
-    int found_count = search_all_lines(image, &lines, &size, VERTICAL_LINE);
+    int found_count = search_all_lines(image, &lines, &size, line_type);
     if (found_count > 0) {
         Line longest_line = EMPTY_LINE;
         for (int vline = 0; vline < found_count; vline++) {
@@ -246,6 +290,20 @@ int search_vline(const Image *image, Line *result) {
     }
     free(lines);
     return 0;
+}
+
+/**
+ * @brief Prints help message.
+ */
+void show_help() {
+    printf("Usage: ./figsearch <operation> [...].\n");
+    printf("Operations: \n");
+    printf("  --help    Show help message.\n");
+    printf("  test      Checking the input file for correct bitmap image content.\n");
+    printf("  hline     Find the longest horizontal line in the image.\n");
+    printf("  vline     Find the longest vertical line in the image.\n");
+    printf("  square    Find the biggest square in the image.\n");
+    printf("Example: ./figsearch --help\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -270,15 +328,14 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         Image image;
-        parse_image(&image, argv[2]);
 
-        if(test_file(argv[2])) {
+        if(parse_image(&image, argv[2])) {
             fprintf(stderr,"%s", "Invalid");
             return -1;
         }
 
         Line longest_line = EMPTY_LINE;
-        int hline_len = search_hline(&image, &longest_line);
+        int hline_len = search_longest_line(&image, &longest_line, HORIZONTAL_LINE);
         free_bitmap(&image);
 
         if (hline_len == -1) {
@@ -289,7 +346,8 @@ int main(int argc, char *argv[]) {
             printf("%s", "Not found");
             return 0;
         }
-        printf("%i %i %i %i", longest_line.x_coordinate, longest_line.y_coordinate, longest_line.x_coordinate, longest_line.y_coordinate+longest_line.length-1);
+        printf("%i %i %i %i", longest_line.start.x_coordinate, longest_line.start.y_coordinate,
+            longest_line.start.x_coordinate, longest_line.start.y_coordinate+longest_line.length-1);
     }
     else if(strcmp(command, "vline") == 0) {
         if (argc < 3) {
@@ -298,15 +356,14 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         Image image;
-        parse_image(&image, argv[2]);
 
-        if(test_file(argv[2])) {
+        if(parse_image(&image, argv[2])) {
             fprintf(stderr,"%s", "Invalid");
             return -1;
         }
 
         Line longest_line = EMPTY_LINE;
-        int vline_len = search_vline(&image, &longest_line);
+        int vline_len = search_longest_line(&image, &longest_line, HORIZONTAL_LINE);
         free_bitmap(&image);
 
         if (vline_len == -1) {
@@ -317,7 +374,8 @@ int main(int argc, char *argv[]) {
             printf("%s", "Not found");
             return 0;
         }
-        printf("%i %i %i %i", longest_line.x_coordinate, longest_line.y_coordinate, longest_line.x_coordinate+longest_line.length-1, longest_line.y_coordinate);
+        printf("%i %i %i %i", longest_line.start.x_coordinate, longest_line.start.y_coordinate,
+            longest_line.start.x_coordinate+longest_line.length-1, longest_line.start.y_coordinate);
     }
     else if(strcmp(command, "square") == 0) {
         if (argc < 3) {
