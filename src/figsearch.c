@@ -158,7 +158,7 @@ int parse_image(Image *dst, const char *filename) {
     for (int row = 0; row < dst->height; row++) {
         for(int col = 0; col < dst->width; col++) {
             int value;
-            if (fscanf(file, "%i", &value) != 1) {
+            if (fscanf(file, "%d", &value) != 1) {
                 free_bitmap(dst);
                 fclose(file);
                 return 1;
@@ -262,82 +262,120 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
 }
 
 int search_all_squares(const Image *image, Square **result, int *result_size) {
-    if (image->height <= 0 || image->width <= 0 || image->bitmap == NULL) {
-        fprintf(stderr, "Image is empty.\n");
+    if (image == NULL || image->bitmap == NULL || image->width <= 0 || image->height <= 0 || result == NULL || result_size == NULL) {
+        fprintf(stderr, "Invalid input parameters.\n");
         return -1;
     }
 
-    if (*result == NULL) {
-        *result_size = 1;
-        *result = malloc(sizeof(Square) * *result_size);
-        if (*result == NULL) {
-            return -1;
-        }
-    }
+    int rows = image->height;
+    int cols = image->width;
 
-
-    Line *horizontal_lines = NULL;
-    int horizontal_size = 0;
-    search_all_lines(image, &horizontal_lines, &horizontal_size, HORIZONTAL_LINE);
-
-    Line *vertical_lines = NULL;
-    int vertical_size = 0;
-    search_all_lines(image, &vertical_lines, &vertical_size, VERTICAL_LINE);
-
-    *result_size = 10;
+    *result_size = 1;
     *result = malloc(sizeof(Square) * (*result_size));
     if (*result == NULL) {
-        free(horizontal_lines);
-        free(vertical_lines);
         return -1;
     }
 
     int square_count = 0;
 
-    for (int vertical_idx = 0; vertical_idx < vertical_size; vertical_idx++) {
-        for (int horizontal_idx = 0; horizontal_idx < horizontal_size; horizontal_idx++) {
-            int start_coord_check =
-                horizontal_lines[horizontal_idx].start.x_coordinate == vertical_lines[vertical_idx].start.x_coordinate &&
-                horizontal_lines[horizontal_idx].start.y_coordinate == vertical_lines[vertical_idx].start.y_coordinate;
-
-            int end_coord_check =
-                horizontal_lines[horizontal_idx].start.x_coordinate ==
-                    vertical_lines[vertical_idx].start.x_coordinate + vertical_lines[vertical_idx].length - 1 &&
-                horizontal_lines[horizontal_idx].start.y_coordinate == vertical_lines[vertical_idx].start.y_coordinate;
-
-            int len_check = horizontal_lines[horizontal_idx].length == vertical_lines[vertical_idx].length &&
-                            horizontal_lines[horizontal_idx].length > 1;
-
-            if ((start_coord_check || end_coord_check) && len_check) {
+    for (int row = 0; row < rows; row++) {
+        for (int col = 0; col < cols; col++) {
+            if (image->bitmap[row][col]) {
                 if (square_count >= *result_size) {
-                    int new_size = (*result_size) + 1;
+                    *result_size += 1;
                     Square *extended = realloc(*result, sizeof(Square) * (*result_size));
                     if (extended == NULL) {
-                        free(horizontal_lines);
-                        free(vertical_lines);
                         free(*result);
                         return -1;
                     }
                     *result = extended;
-                    *result_size = new_size;
                 }
-
-                (*result)[square_count].start_point.x_coordinate = horizontal_lines[horizontal_idx].start.x_coordinate;
-                (*result)[square_count].start_point.y_coordinate = horizontal_lines[horizontal_idx].start.y_coordinate;
-                (*result)[square_count].end_point.x_coordinate = horizontal_lines[horizontal_idx].start.x_coordinate + horizontal_lines[horizontal_idx].length - 1;
-                (*result)[square_count].end_point.y_coordinate = vertical_lines[vertical_idx].start.y_coordinate + vertical_lines[vertical_idx].length - 1;
-
+                (*result)[square_count].start_point.x_coordinate = row;
+                (*result)[square_count].start_point.y_coordinate = col;
+                (*result)[square_count].end_point.x_coordinate = row;
+                (*result)[square_count].end_point.y_coordinate = col;
                 square_count++;
             }
         }
     }
 
-    free(horizontal_lines);
-    free(vertical_lines);
+    for (int start_row = 0; start_row < rows; start_row++) {
+        for (int end_row = start_row + 1; end_row < rows; end_row++) {
+            int *add_row = malloc(sizeof(int) * rows);
+            int *add_col = malloc(sizeof(int) * cols);
+
+            if (add_row == NULL || add_col == NULL) {
+                free(add_row);
+                free(add_col);
+                free(*result);
+                return -1;
+            }
+
+            for (int col = 0; col < cols; col++) {
+                add_row[col] = image->bitmap[start_row][col] + image->bitmap[end_row][col];
+            }
+            for (int row = 0; row < rows; row++) {
+                add_col[row] = image->bitmap[row][start_row] + image->bitmap[row][end_row];
+            }
+
+            int row_distance = end_row - start_row;
+            int row_sum = 0, col_sum = 0;
+
+            for (int row_in_range = 0; row_in_range <= row_distance; row_in_range++) {
+                row_sum += add_row[row_in_range];
+                col_sum += add_col[row_in_range];
+            }
+
+            for (int start_col = 0; start_col <= cols - row_distance - 1; start_col++) {
+                int end_col = start_col + row_distance;
+                if (row_sum == 2 * (row_distance + 1)) {
+                    if (square_count >= *result_size) {
+                        *result_size += 1;
+                        Square *extended = realloc(*result, sizeof(Square) * (*result_size));
+                        if (extended == NULL) {
+                            free(add_row);
+                            free(add_col);
+                            free(*result);
+                            return -1;
+                        }
+                        *result = extended;
+                    }
+                    (*result)[square_count].start_point.x_coordinate = start_row;
+                    (*result)[square_count].start_point.y_coordinate = start_col;
+                    (*result)[square_count].end_point.x_coordinate = end_row;
+                    (*result)[square_count].end_point.y_coordinate = end_col;
+                    square_count++;
+                }
+                // if (col_sum == 2 * (row_distance + 1)) {
+                //     if (square_count >= *result_size) {
+                //         *result_size += 1;
+                //         Square *extended = realloc(*result, sizeof(Square) * (*result_size));
+                //         if (extended == NULL) {
+                //             free(add_row);
+                //             free(add_col);
+                //             free(*result);
+                //             return -1;
+                //         }
+                //         *result = extended;
+                //     }
+                //     (*result)[square_count].start_point.x_coordinate = start_col;
+                //     (*result)[square_count].start_point.y_coordinate = start_row;
+                //     (*result)[square_count].end_point.x_coordinate = end_col;
+                //     (*result)[square_count].end_point.y_coordinate = end_row;
+                //     square_count++;
+                // }
+
+                row_sum = (end_col + 1 < cols) ? row_sum - add_row[start_col] + add_row[end_col + 1] : row_sum;
+                col_sum = (end_col + 1 < rows) ? col_sum - add_col[start_col] + add_col[end_col + 1] : col_sum;
+            }
+
+            free(add_row);
+            free(add_col);
+        }
+    }
 
     return square_count;
 }
-
 
 /**
  * @brief Searchs the longest line in image.
@@ -356,39 +394,61 @@ int search_longest_line(const Image *image, Line *result, int line_type) {
     Line *lines = NULL;
     int size = 0;
     int found_count = search_all_lines(image, &lines, &size, line_type);
-    if (found_count > 0) {
-        Line longest_line = EMPTY_LINE;
-        for (int line = 0; line < found_count; line++) {
-            if (lines[line].length > longest_line.length) {
-                longest_line = lines[line];
-            }
-        }
-        free(lines);
-        lines = NULL;
-        *result = longest_line;
-        return longest_line.length;
+    if (found_count <= 0) {
+        return 0;
     }
-    return 0;
+    Line longest_line = EMPTY_LINE;
+    for (int line = 0; line < found_count; line++) {
+        if (lines[line].length > longest_line.length) {
+            longest_line = lines[line];
+        }
+    }
+    if (longest_line.length == 1 && line_type == VERTICAL_LINE) {
+        return search_longest_line(image, result, HORIZONTAL_LINE);
+    }
+    free(lines);
+    lines = NULL;
+    *result = longest_line;
+    return longest_line.length;
+}
+
+int is_empty(Square *square) {
+    Square empty_square = EMPTY_SQUARE;
+    return  square->start_point.x_coordinate == empty_square.start_point.x_coordinate &&
+        square->end_point.x_coordinate == empty_square.end_point.x_coordinate &&
+            square->start_point.y_coordinate == empty_square.start_point.y_coordinate &&
+                square->end_point.y_coordinate == empty_square.end_point.y_coordinate;
 }
 
 int search_biggest_square(const Image *image, Square *result) {
-    if (result == NULL){}
     if (image->height < 0 || image->width < 0 || image->bitmap == NULL)
         return -1;
     Square *squares = NULL;
+
     int size = 0;
     int squares_count = search_all_squares(image, &squares, &size);
     if (squares_count == 0) {
         return 0;
     }
+
+    Square *filtered_squares = malloc(sizeof(Square) * squares_count);
+    if (filtered_squares == NULL) {
+        return -1;
+    }
+    for (int square_idx = 0; square_idx < squares_count; square_idx++) {
+
+    }
+
     Square biggest_square = EMPTY_SQUARE;
     for (int square_idx = 0; square_idx < squares_count; square_idx++) {
         int square_idx_perimeter = (squares[square_idx].end_point.x_coordinate - squares[square_idx].start_point.x_coordinate + 1) * 4;
         int biggest_perimeter = (biggest_square.end_point.x_coordinate - biggest_square.start_point.x_coordinate + 1) * 4;
-        if (square_idx_perimeter > biggest_perimeter) {
+        if (square_idx_perimeter > biggest_perimeter || is_empty(&biggest_square)) {
             biggest_square = squares[square_idx];
         }
     }
+    free(squares);
+    free(filtered_squares);
     *result = biggest_square;
     return (biggest_square.end_point.x_coordinate - biggest_square.start_point.x_coordinate + 1) * 4;
 }
@@ -453,7 +513,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr,"%s", "Invalid");
             return -1;
         }
-        if (longest_line.length-1 == 0) {
+        if (longest_line.length == 0) {
             printf("%s", "Not found");
             return 0;
         }
@@ -480,6 +540,8 @@ int main(int argc, char *argv[]) {
 
         Square biggest_square = EMPTY_SQUARE;
         int biggest_perimeter = search_biggest_square(&image, &biggest_square);
+
+        free_bitmap(&image);
 
         if (biggest_perimeter <= 0) {
             printf("%s", "Not found");
