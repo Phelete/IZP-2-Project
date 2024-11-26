@@ -198,7 +198,6 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
         *result_size = 1;
         *result = malloc(sizeof(Line) * *result_size);
         if (*result == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
             return -1;
         }
     }
@@ -233,7 +232,7 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
             }
             if (in_line) {
                 if (lines_idx >= *result_size) {
-                    int new_size = (*result_size) * 2;
+                    int new_size = (*result_size) + 1;
                     Line *lines_extend = realloc(*result, sizeof(Line) * new_size);
                     if (lines_extend == NULL) {
                         return -1;
@@ -248,7 +247,7 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
         }
         if (in_line) {
             if (lines_idx >= *result_size) {
-                int new_size = (*result_size) * 2;
+                int new_size = (*result_size) + 1;
                 Line *lines_extend = realloc(*result, sizeof(Line) * new_size);
                 if (lines_extend == NULL) {
                     return -1;
@@ -263,15 +262,19 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
 }
 
 int search_all_squares(const Image *image, Square **result, int *result_size) {
-    if (image == NULL || image->bitmap == NULL || image->height <= 0 || image->width <= 0) {
-        fprintf(stderr, "Invalid image.\n");
+    if (image->height <= 0 || image->width <= 0 || image->bitmap == NULL) {
+        fprintf(stderr, "Image is empty.\n");
         return -1;
     }
 
-    if (result == NULL || result_size == NULL) {
-        fprintf(stderr, "Invalid result pointers.\n");
-        return -1;
+    if (*result == NULL) {
+        *result_size = 1;
+        *result = malloc(sizeof(Square) * *result_size);
+        if (*result == NULL) {
+            return -1;
+        }
     }
+
 
     Line *horizontal_lines = NULL;
     int horizontal_size = 0;
@@ -284,7 +287,6 @@ int search_all_squares(const Image *image, Square **result, int *result_size) {
     *result_size = 10;
     *result = malloc(sizeof(Square) * (*result_size));
     if (*result == NULL) {
-        fprintf(stderr, "Memory allocation failed for result array.\n");
         free(horizontal_lines);
         free(vertical_lines);
         return -1;
@@ -308,16 +310,16 @@ int search_all_squares(const Image *image, Square **result, int *result_size) {
 
             if ((start_coord_check || end_coord_check) && len_check) {
                 if (square_count >= *result_size) {
-                    *result_size *= 2;
+                    int new_size = (*result_size) + 1;
                     Square *extended = realloc(*result, sizeof(Square) * (*result_size));
                     if (extended == NULL) {
-                        fprintf(stderr, "Memory reallocation failed for result array.\n");
                         free(horizontal_lines);
                         free(vertical_lines);
                         free(*result);
                         return -1;
                     }
                     *result = extended;
+                    *result_size = new_size;
                 }
 
                 (*result)[square_count].start_point.x_coordinate = horizontal_lines[horizontal_idx].start.x_coordinate;
