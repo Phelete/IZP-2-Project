@@ -1,7 +1,7 @@
 /**
  * @author Behari Youssef
  * @name Figsearch
- * @date 24 November 2024
+ * @date 28 November 2024
  * @version 1.0
  *
  * Description:
@@ -127,9 +127,9 @@ int free_bitmap(Image *image) {
 }
 
 /**
- * @brief Parses bitmap from to image structure.
+ * @brief Parses bitmap from file to image structure.
  *
- * @param[in] filename Pointer to image where bitmap stored is.
+ * @param[in] filename Name of the image file.
  * @param[out] dst Pointer to image where will bitmap stored be.
  * @return 0 if parsing was successful(everything went well).
  * @return 1 if parsing occurred with an error(error while parsing).
@@ -144,6 +144,8 @@ int parse_image(Image *dst, const char *filename) {
         fclose(file);
         return 1;
     }
+    // TODO Dont works without print
+    printf(" ");
 
     if (test_file(filename)) {
         fclose(file);
@@ -261,6 +263,16 @@ int search_all_lines(const Image *image, Line **result, int *result_size, int li
     return lines_idx;
 }
 
+/**
+ * @brief Search all squares in image.
+ *
+ * @param[in] image Pointer to image where bitmap stored is.
+ * @param[out] result Pointer to square array where square will stored be.
+ * @param[in] result_size Pointer to integer value, where square array size stored is.
+ *
+ * @return squares count If function executing was without error(everything went well).
+ * @return -1 If error occurred while executing the function(error occurred).
+ */
 int search_all_squares(const Image *image, Square **result, int *result_size) {
     if (image == NULL || image->bitmap == NULL || image->width <= 0 || image->height <= 0 || result == NULL || result_size == NULL) {
         fprintf(stderr, "Invalid input parameters.\n");
@@ -278,27 +290,6 @@ int search_all_squares(const Image *image, Square **result, int *result_size) {
 
     int square_count = 0;
 
-    for (int row = 0; row < rows; row++) {
-        for (int col = 0; col < cols; col++) {
-            if (image->bitmap[row][col]) {
-                if (square_count >= *result_size) {
-                    *result_size += 1;
-                    Square *extended = realloc(*result, sizeof(Square) * (*result_size));
-                    if (extended == NULL) {
-                        free(*result);
-                        return -1;
-                    }
-                    *result = extended;
-                }
-                (*result)[square_count].start_point.x_coordinate = row;
-                (*result)[square_count].start_point.y_coordinate = col;
-                (*result)[square_count].end_point.x_coordinate = row;
-                (*result)[square_count].end_point.y_coordinate = col;
-                square_count++;
-            }
-        }
-    }
-
     for (int start_row = 0; start_row < rows; start_row++) {
         for (int end_row = start_row + 1; end_row < rows; end_row++) {
             int *add_row = malloc(sizeof(int) * rows);
@@ -312,6 +303,38 @@ int search_all_squares(const Image *image, Square **result, int *result_size) {
             }
 
             for (int col = 0; col < cols; col++) {
+                if (image->bitmap[start_row][col]) {
+                    if (square_count >= *result_size) {
+                        *result_size += 1;
+                        Square *extended = realloc(*result, sizeof(Square) * (*result_size));
+                        if (extended == NULL) {
+                            free(*result);
+                            return -1;
+                        }
+                        *result = extended;
+                    }
+                    (*result)[square_count].start_point.x_coordinate = start_row;
+                    (*result)[square_count].start_point.y_coordinate = col;
+                    (*result)[square_count].end_point.x_coordinate = start_row;
+                    (*result)[square_count].end_point.y_coordinate = col;
+                    square_count++;
+                }
+                if (image->bitmap[end_row][col]) {
+                    if (square_count >= *result_size) {
+                        *result_size += 1;
+                        Square *extended = realloc(*result, sizeof(Square) * (*result_size));
+                        if (extended == NULL) {
+                            free(*result);
+                            return -1;
+                        }
+                        *result = extended;
+                    }
+                    (*result)[square_count].start_point.x_coordinate = end_row;
+                    (*result)[square_count].start_point.y_coordinate = col;
+                    (*result)[square_count].end_point.x_coordinate = end_row;
+                    (*result)[square_count].end_point.y_coordinate = col;
+                    square_count++;
+                }
                 add_row[col] = image->bitmap[start_row][col] + image->bitmap[end_row][col];
             }
             for (int row = 0; row < rows; row++) {
@@ -412,6 +435,13 @@ int search_longest_line(const Image *image, Line *result, int line_type) {
     return longest_line.length;
 }
 
+/**
+ * @brief Checks is square empty
+ *
+ * @param square
+ * @return 1 If square is empty
+ * @return 0 If square is not empty
+ */
 int is_empty(Square *square) {
     Square empty_square = EMPTY_SQUARE;
     return  square->start_point.x_coordinate == empty_square.start_point.x_coordinate &&
@@ -420,6 +450,14 @@ int is_empty(Square *square) {
                 square->end_point.y_coordinate == empty_square.end_point.y_coordinate;
 }
 
+/**
+ * @brief Searchs biggest square in squares array.
+ *
+ * @param image
+ * @param result
+ * @return perimeter of the biggest square.
+ * @return -1 if exectuion was not successful
+ */
 int search_biggest_square(const Image *image, Square *result) {
     if (image->height < 0 || image->width < 0 || image->bitmap == NULL)
         return -1;
@@ -427,16 +465,13 @@ int search_biggest_square(const Image *image, Square *result) {
 
     int size = 0;
     int squares_count = search_all_squares(image, &squares, &size);
-    if (squares_count == 0) {
-        return 0;
+    if (squares_count == -1) {
+        return -1;
     }
 
     Square *filtered_squares = malloc(sizeof(Square) * squares_count);
     if (filtered_squares == NULL) {
         return -1;
-    }
-    for (int square_idx = 0; square_idx < squares_count; square_idx++) {
-
     }
 
     Square biggest_square = EMPTY_SQUARE;
