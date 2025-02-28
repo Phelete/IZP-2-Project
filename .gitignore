@@ -1,6 +1,1 @@
-.gitignore
-/tests
-/.idea
-*.py
-/tests
-/cmake-build-debug
+.idea
