@@ -1,6 +1,6 @@
 # 2 Project in IZP course FIT VUT
 
-Target was make the simply T9 algorithm analog.
+The target was to create an algorithm that will search for figures in a raster image.
 
 ## Run Locally
 
@@ -19,13 +19,13 @@ Go to the project directory
 Compile from sources
 
 ```bash
-  gcc -std=c11 -Wall -Wextra -Werror tnine.c -o tnine
+  gcc -std=c11 -Wall -Wextra -Werror src/figsearch.c -o bin/figsearch
 ```
 
 Start the application
 
 ```bash
-  ./tnine < seznam
+  ./figsearch help
 ```
 
 ## Authors
